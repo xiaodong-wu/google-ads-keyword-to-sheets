@@ -4,10 +4,12 @@ A Codex skill that collects all unique English keyword ideas from the signed-in 
 
 The workflow uses the visible Google Ads interface and a one-time CSV export. It does not use the Google Ads API or generate keyword suggestions from another source.
 
+The supplied domain is a destination-tab selector only. The skill never enters it, or a URL derived from it, into the Google Ads website filter.
+
 ## What it does
 
-- Accepts one seed keyword, one geographic location, one domain, and an optional `dry-run` flag.
-- Configures Keyword Planner for English, Google Search, the past 12 months, and the requested location.
+- Accepts one seed keyword, one geographic location, one destination-tab domain, and an optional `dry-run` flag.
+- Configures Keyword Planner for English, Google Search, the past 12 months, and the requested location, with no website/site filter.
 - Downloads all keyword ideas as CSV and preserves Google Ads relevance order.
 - Normalizes text with NFKC, removes duplicate ideas, excludes the seed keyword, filters non-Latin-script phrases, and removes keywords already present in the destination tab.
 - Appends at most 500 rows per batch and verifies every written range.
@@ -45,11 +47,11 @@ Run the live workflow after reviewing the planned destination range:
 $google-ads-keyword-to-sheets 关键词="protein powder" 地理位置="United States" 域名="www.nutricdmo.com"
 ```
 
-The domain defaults to `www.nutricdmo.com` when omitted. Each run accepts exactly one seed keyword. If Google Ads shows multiple plausible geographic matches, the skill pauses for the user to select one.
+The domain defaults to `www.nutricdmo.com` when omitted and is used only to match the Google Sheets tab. It is not used in the Google Ads query. Each run accepts exactly one seed keyword. If Google Ads shows multiple plausible geographic matches, the skill pauses for the user to select one.
 
 ## Destination contract
 
-The destination spreadsheet is fixed. The normalized domain must exactly match an existing visible tab; the skill never creates a spreadsheet or tab.
+The destination spreadsheet is fixed. The normalized domain must exactly match an existing visible tab; the skill never creates a spreadsheet or tab and never reuses the domain as a Google Ads website input.
 
 The expected A–H headers are:
 

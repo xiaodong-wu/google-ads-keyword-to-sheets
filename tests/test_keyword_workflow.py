@@ -132,5 +132,24 @@ class SheetPlanningTests(unittest.TestCase):
         self.assertFalse(workflow.is_english_keyword("протеин"))
 
 
+class SkillInstructionContractTests(unittest.TestCase):
+    def test_domain_is_sheet_only_and_ads_website_filter_stays_empty(self):
+        skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        readme_text = (SKILL_ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "Use the domain only to normalize and select the destination Sheet tab.",
+            skill_text,
+        )
+        self.assertIn(
+            "Clear the optional website-filter field if it contains any value and leave it empty.",
+            skill_text,
+        )
+        self.assertIn("no active website/site filter", skill_text)
+        self.assertNotIn("Build the website seed", skill_text)
+        self.assertNotIn("fill the website-filter field with the website seed", skill_text)
+        self.assertIn("The supplied domain is a destination-tab selector only.", readme_text)
+
+
 if __name__ == "__main__":
     unittest.main()

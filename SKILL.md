@@ -1,12 +1,14 @@
 ---
 name: google-ads-keyword-to-sheets
-description: Fetch all unique English keyword ideas from the signed-in Google Ads Keyword Planner in Chrome using one seed keyword, a geographic location, and a domain, then append them to the matching domain tab in the configured Automatically publish articles Google Sheet. Use when Codex must run or dry-run this exact Google Ads-to-Sheets keyword collection workflow, including CSV export parsing, existing-keyword deduplication, A-E template propagation, and verified batch writes.
+description: Fetch all unique English keyword ideas from the signed-in Google Ads Keyword Planner in Chrome using one seed keyword and a geographic location, then use the supplied domain only to select the matching tab in the configured Automatically publish articles Google Sheet. Never use the domain as a Google Ads website seed or site filter. Use when Codex must run or dry-run this exact Google Ads-to-Sheets keyword collection workflow, including CSV export parsing, existing-keyword deduplication, A-E template propagation, and verified batch writes.
 ---
 
 # Google Ads Keyword Ideas To Sheets
 
 Run one auditable Keyword Planner-to-Sheets job. Accept exactly one `关键词`, one `地理位置`, one
 `域名`, and optional `dry-run`. Default the domain to `www.nutricdmo.com` only when it is omitted.
+Use the domain only to normalize and select the destination Sheet tab. Never send the domain or a
+URL derived from it to Google Ads.
 Treat an explicit request without `dry-run` as authorization to submit the Keyword Planner query,
 download its CSV, and append verified rows to the configured Sheet.
 
@@ -23,9 +25,9 @@ download its CSV, and append verified rows to the configured Sheet.
 
 1. **Validate inputs**
    - Require one non-empty seed keyword and geographic location. Reject a keyword list.
-   - Normalize the domain with:
-     `python scripts/keyword_workflow.py normalize-domain --domain '<domain>'`.
-   - Build the website seed as `https://<normalized-domain>/`.
+   - Normalize the domain solely for destination-tab matching with:
+     `python3 scripts/keyword_workflow.py normalize-domain --domain '<domain>'`.
+   - Do not derive a website seed, URL, or any other Google Ads input from the normalized domain.
    - Create a temporary run directory with `mktemp -d`. Keep only the Google Ads CSV, an A-column-only
      existing-keyword snapshot, parser output, and non-secret counts there. Never place columns C-E
      or a publishing key in local files, logs, commands, or reports.
@@ -45,15 +47,17 @@ download its CSV, and append verified rows to the configured Sheet.
      If none exists, open `https://ads.google.com/aw/keywordplanner/home` in Chrome.
    - If sign-in blocks the page, leave the tab as a handoff and ask the user to sign in in Chrome.
      Follow the Chrome skill for CAPTCHA or permission prompts.
-   - Open **Discover new keywords** or edit the current keyword/website query. Select **Start with
-     keywords**. Remove previous keyword chips, enter the one exact seed keyword, and fill the
-     website-filter field with the website seed.
+   - Open **Discover new keywords** or edit the current query. Select **Start with keywords**.
+     Remove previous keyword chips and enter the one exact seed keyword.
+   - Clear the optional website-filter field if it contains any value and leave it empty. Never
+     enter the normalized domain, a URL derived from it, or any other website into Google Ads.
    - Set the geographic target to the requested location. Require one exact visible match; when
      multiple plausible canonical matches remain, ask the user to choose instead of guessing.
    - Set targeting language to English, network to Google, date range to the past 12 months, and
      retain the adult-content exclusion.
    - Submit **Get results**. Verify the visible seed, location, English targeting, Google network,
-     date range, and a non-zero available-ideas count before exporting.
+     date range, no active website/site filter, and a non-zero available-ideas count before
+     exporting.
    - Treat an account-revoked banner as a warning only when query and export controls still work.
      If an ad-blocker or account-state dialog prevents either action, stop and tell the user exactly
      what must be fixed.
@@ -64,7 +68,7 @@ download its CSV, and append verified rows to the configured Sheet.
    - Run:
 
      ```bash
-     python scripts/keyword_workflow.py prepare \
+     python3 scripts/keyword_workflow.py prepare \
        --ads-csv <downloaded-csv> \
        --seed <exact-seed-keyword> \
        --existing-file <a-column-only-json> \
@@ -107,6 +111,7 @@ download its CSV, and append verified rows to the configured Sheet.
 ## Failure rules
 
 - Do not fall back to web search, invented suggestions, or Google Ads API results.
+- Do not submit or export a Google Ads query while any website/site filter is active.
 - Do not write when the spreadsheet title, domain tab, headers, template row, destination emptiness,
   browser targeting, CSV header, or readback verification is uncertain.
 - Do not create a new spreadsheet or tab and do not modify F:H.
