@@ -1,0 +1,4 @@
+interface:
+  display_name: "Google Ads 关键词写入表格"
+  short_description: "从 Google Ads 关键词规划师获取英文提示并写入域名子表"
+  default_prompt: "Use $google-ads-keyword-to-sheets to 获取指定关键词、地理位置和域名的英文提示，并写入对应 Google 表格子表。"
