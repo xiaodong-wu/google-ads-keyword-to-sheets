@@ -13,6 +13,9 @@ exact visible tab-title match. Do not create a missing tab.
 
 ## Required headers
 
+The literal localized values below are part of the existing external spreadsheet schema. Keep them
+unchanged even though the skill interface and instructions are English.
+
 Require row 1 columns A:H in this exact order:
 
 1. `核心关键字`

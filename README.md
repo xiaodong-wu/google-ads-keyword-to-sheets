@@ -38,13 +38,13 @@ Restart Codex if the skill is not discovered immediately.
 Run a read-only dry run first:
 
 ```text
-$google-ads-keyword-to-sheets 关键词="protein powder" 地理位置="United States" 域名="www.nutricdmo.com" dry-run
+$google-ads-keyword-to-sheets keyword="protein powder" location="United States" domain="www.nutricdmo.com" dry-run
 ```
 
 Run the live workflow after reviewing the planned destination range:
 
 ```text
-$google-ads-keyword-to-sheets 关键词="protein powder" 地理位置="United States" 域名="www.nutricdmo.com"
+$google-ads-keyword-to-sheets keyword="protein powder" location="United States" domain="www.nutricdmo.com"
 ```
 
 The domain defaults to `www.nutricdmo.com` when omitted and is used only to match the Google Sheets tab. It is not used in the Google Ads query. Each run accepts exactly one seed keyword. If Google Ads shows multiple plausible geographic matches, the skill pauses for the user to select one.
@@ -53,18 +53,18 @@ The domain defaults to `www.nutricdmo.com` when omitted and is used only to matc
 
 The destination spreadsheet is fixed. The normalized domain must exactly match an existing visible tab; the skill never creates a spreadsheet or tab and never reuses the domain as a Google Ads website input.
 
-The expected A–H headers are:
+The sheet contract validates the existing localized header strings exactly. Their English meanings and write behavior are:
 
-| Column | Header | Write behavior |
+| Column | Meaning | Write behavior |
 | --- | --- | --- |
-| A | 核心关键字 | New unique keyword idea |
-| B | 目标国家 | User-provided location text |
-| C | 目标客户 | Copied from the latest complete template row |
-| D | 相关产品链接 | Copied from the latest complete template row |
-| E | 发布密钥 | Copied only inside Google Sheets; never exported or reported |
-| F | 发布状态 | Left blank |
-| G | 发布时间 | Left blank |
-| H | 新发布文章链接 | Left blank |
+| A | Core keyword | New unique keyword idea |
+| B | Target country | User-provided location text |
+| C | Target customer | Copied from the latest complete template row |
+| D | Related product URL | Copied from the latest complete template row |
+| E | Publishing key | Copied only inside Google Sheets; never exported or reported |
+| F | Publication status | Left blank |
+| G | Publication time | Left blank |
+| H | Published article URL | Left blank |
 
 See [`references/sheet-contract.md`](references/sheet-contract.md) for the complete validation and write contract.
 

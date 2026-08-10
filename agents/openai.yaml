@@ -1,4 +1,4 @@
 interface:
-  display_name: "Google Ads 关键词写入表格"
-  short_description: "仅按关键词和地区获取 Google Ads 提示，域名只匹配表格子表"
-  default_prompt: "Use $google-ads-keyword-to-sheets to 获取指定关键词和地理位置的英文提示；仅用域名匹配 Google 表格子表，不将域名传给 Google Ads。"
+  display_name: "Google Ads Keywords to Sheets"
+  short_description: "Collect Google Ads ideas and append them to Sheets"
+  default_prompt: "Use $google-ads-keyword-to-sheets to collect English keyword ideas for one keyword and location, then append them to the Sheet tab selected by the domain."

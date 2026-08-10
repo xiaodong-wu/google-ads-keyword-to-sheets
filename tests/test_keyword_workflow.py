@@ -150,6 +150,12 @@ class SkillInstructionContractTests(unittest.TestCase):
         self.assertNotIn("fill the website-filter field with the website seed", skill_text)
         self.assertIn("The supplied domain is a destination-tab selector only.", readme_text)
 
+    def test_user_facing_skill_copy_is_english(self):
+        for relative_path in ("SKILL.md", "README.md", "agents/openai.yaml"):
+            with self.subTest(relative_path=relative_path):
+                text = (SKILL_ROOT / relative_path).read_text(encoding="utf-8")
+                self.assertNotRegex(text, r"[\u3400-\u9fff]")
+
 
 if __name__ == "__main__":
     unittest.main()

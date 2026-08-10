@@ -3,10 +3,10 @@ name: google-ads-keyword-to-sheets
 description: Fetch all unique English keyword ideas from the signed-in Google Ads Keyword Planner in Chrome using one seed keyword and a geographic location, then use the supplied domain only to select the matching tab in the configured Automatically publish articles Google Sheet. Never use the domain as a Google Ads website seed or site filter. Use when Codex must run or dry-run this exact Google Ads-to-Sheets keyword collection workflow, including CSV export parsing, existing-keyword deduplication, A-E template propagation, and verified batch writes.
 ---
 
-# Google Ads Keyword Ideas To Sheets
+# Google Ads Keyword Ideas to Sheets
 
-Run one auditable Keyword Planner-to-Sheets job. Accept exactly one `关键词`, one `地理位置`, one
-`域名`, and optional `dry-run`. Default the domain to `www.nutricdmo.com` only when it is omitted.
+Run one auditable Keyword Planner-to-Sheets job. Accept exactly one `keyword`, one `location`, one
+`domain`, and optional `dry-run`. Default the domain to `www.nutricdmo.com` only when it is omitted.
 Use the domain only to normalize and select the destination Sheet tab. Never send the domain or a
 URL derived from it to Google Ads.
 Treat an explicit request without `dry-run` as authorization to submit the Keyword Planner query,
