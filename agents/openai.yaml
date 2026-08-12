@@ -1,4 +1,4 @@
 interface:
   display_name: "Google Ads Keywords to Sheets or CSV"
-  short_description: "Filter Ads keywords to Sheets or detailed CSV"
-  default_prompt: "Use $google-ads-keyword-to-sheets to collect and filter Google Ads keyword ideas, writing to the domain-matched Sheet when a domain is supplied or exporting all keyword metrics to CSV when it is omitted."
+  short_description: "Filter precise Ads keywords to Sheets or CSV"
+  default_prompt: "Use $google-ads-keyword-to-sheets to collect Google Ads keyword ideas, remove low-value, branded, and imprecise terms, then write to a domain-matched Sheet or export a detailed CSV."

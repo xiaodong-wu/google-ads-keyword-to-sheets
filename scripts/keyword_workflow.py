@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Normalize domains and prepare high-intent Google Ads keyword ideas."""
+"""Normalize domains and prepare precise Google Ads keyword ideas."""
 
 import argparse
 import csv
@@ -53,7 +53,6 @@ DEFAULT_LANGUAGE = "English"
 DEFAULT_LOCATION = "All locations"
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BLOCKED_PHRASES_FILE = SKILL_ROOT / "references" / "blocked-phrases.txt"
-DEFAULT_BUYER_INTENT_PHRASES_FILE = SKILL_ROOT / "references" / "buyer-intent-phrases.txt"
 DEFAULT_CONFIRMED_BRANDS_FILE = SKILL_ROOT / "references" / "confirmed-brands.txt"
 
 
@@ -289,24 +288,20 @@ def merge_phrases(*groups: Iterable[str]) -> List[str]:
 def resolve_filter_phrases(
     language: str,
     blocked_phrases: Optional[Iterable[str]] = None,
-    buyer_intent_phrases: Optional[Iterable[str]] = None,
     confirmed_brands: Optional[Iterable[str]] = None,
-) -> Tuple[List[str], List[str], List[str]]:
-    """Resolve bundled English rules or require explicit localized rules."""
+) -> Tuple[List[str], List[str]]:
+    """Resolve bundled English blocked phrases or require a localized list."""
     if is_english_language(language):
         default_blocked = load_phrase_file(DEFAULT_BLOCKED_PHRASES_FILE)
-        default_intent = load_phrase_file(DEFAULT_BUYER_INTENT_PHRASES_FILE)
     else:
         default_blocked = []
-        default_intent = []
-        if blocked_phrases is None or buyer_intent_phrases is None:
+        if blocked_phrases is None:
             raise KeywordWorkflowError(
-                "Non-English runs require localized blocked-phrase and buyer-intent files"
+                "Non-English runs require a localized blocked-phrase file"
             )
     default_brands = load_phrase_file(DEFAULT_CONFIRMED_BRANDS_FILE)
     return (
         merge_phrases(default_blocked, blocked_phrases or []),
-        merge_phrases(default_intent, buyer_intent_phrases or []),
         merge_phrases(default_brands, confirmed_brands or []),
     )
 
@@ -323,22 +318,22 @@ def select_keyword_ideas(
     existing_keywords: Iterable[str],
     language: str = DEFAULT_LANGUAGE,
     blocked_phrases: Optional[Iterable[str]] = None,
-    buyer_intent_phrases: Optional[Iterable[str]] = None,
     confirmed_brands: Optional[Iterable[str]] = None,
+    irrelevant_keywords: Optional[Iterable[str]] = None,
 ) -> Tuple[List[str], List[int], Dict[str, Any]]:
     """Return filtered keywords, their source indexes, and exclusion counts."""
     seed_key = dedupe_key(seed)
     if not seed_key:
         raise KeywordWorkflowError("Seed keyword is required")
     target_language = normalize_text(language) or DEFAULT_LANGUAGE
-    active_blocked, active_intent, active_brands = resolve_filter_phrases(
+    active_blocked, active_brands = resolve_filter_phrases(
         target_language,
         blocked_phrases=blocked_phrases,
-        buyer_intent_phrases=buyer_intent_phrases,
         confirmed_brands=confirmed_brands,
     )
-    if not active_intent:
-        raise KeywordWorkflowError("Buyer-intent phrase list cannot be empty")
+    irrelevant_keys = {
+        phrase_key(value) for value in (irrelevant_keywords or []) if phrase_key(value)
+    }
     header_keys = {dedupe_key(header) for header in REQUIRED_HEADERS}
     existing_keys = {dedupe_key(value) for value in existing_keywords if dedupe_key(value)}
     existing_keys.difference_update(header_keys)
@@ -352,7 +347,7 @@ def select_keyword_ideas(
         "duplicate_export_excluded": 0,
         "blocked_phrase_excluded": 0,
         "confirmed_brand_excluded": 0,
-        "buyer_intent_excluded": 0,
+        "irrelevant_keyword_excluded": 0,
         "existing_excluded": 0,
     }
     for source_index, raw_keyword in enumerate(exported_keywords):
@@ -377,8 +372,8 @@ def select_keyword_ideas(
         if contains_any_phrase(keyword, active_brands):
             counts["confirmed_brand_excluded"] += 1
             continue
-        if not contains_any_phrase(keyword, active_intent):
-            counts["buyer_intent_excluded"] += 1
+        if phrase_key(keyword) in irrelevant_keys:
+            counts["irrelevant_keyword_excluded"] += 1
             continue
         if keyword_key in existing_keys:
             counts["existing_excluded"] += 1
@@ -411,8 +406,8 @@ def prepare_keyword_ideas(
     chunk_size: int = 500,
     language: str = DEFAULT_LANGUAGE,
     blocked_phrases: Optional[Iterable[str]] = None,
-    buyer_intent_phrases: Optional[Iterable[str]] = None,
     confirmed_brands: Optional[Iterable[str]] = None,
+    irrelevant_keywords: Optional[Iterable[str]] = None,
 ) -> Dict[str, Any]:
     new_keywords, _, counts = select_keyword_ideas(
         exported_keywords,
@@ -420,8 +415,8 @@ def prepare_keyword_ideas(
         existing_keywords=existing_keywords,
         language=language,
         blocked_phrases=blocked_phrases,
-        buyer_intent_phrases=buyer_intent_phrases,
         confirmed_brands=confirmed_brands,
+        irrelevant_keywords=irrelevant_keywords,
     )
     return build_prepared_result(new_keywords, counts, chunk_size)
 
@@ -433,8 +428,8 @@ def prepare_ads_table(
     chunk_size: int = 500,
     language: str = DEFAULT_LANGUAGE,
     blocked_phrases: Optional[Iterable[str]] = None,
-    buyer_intent_phrases: Optional[Iterable[str]] = None,
     confirmed_brands: Optional[Iterable[str]] = None,
+    irrelevant_keywords: Optional[Iterable[str]] = None,
 ) -> Tuple[Dict[str, Any], List[List[str]]]:
     """Filter a parsed Ads table while retaining every source metric column."""
     keyword_column = table["keyword_column"]
@@ -446,8 +441,8 @@ def prepare_ads_table(
         existing_keywords=existing_keywords,
         language=language,
         blocked_phrases=blocked_phrases,
-        buyer_intent_phrases=buyer_intent_phrases,
         confirmed_brands=confirmed_brands,
+        irrelevant_keywords=irrelevant_keywords,
     )
     prepared = build_prepared_result(new_keywords, counts, chunk_size)
     filtered_rows = [list(data_rows[index]) for index in selected_indices]
@@ -540,8 +535,13 @@ def build_parser() -> argparse.ArgumentParser:
     prepare_parser.add_argument("--language", default=DEFAULT_LANGUAGE)
     prepare_parser.add_argument("--existing-file", type=Path)
     prepare_parser.add_argument("--blocked-phrase-file", type=Path)
-    prepare_parser.add_argument("--buyer-intent-file", type=Path)
     prepare_parser.add_argument("--brand-file", type=Path)
+    prepare_parser.add_argument(
+        "--irrelevant-keyword-file",
+        required=True,
+        type=Path,
+        help="exclude exact, run-specific keyword ideas judged topically imprecise",
+    )
     prepare_parser.add_argument(
         "--detail-output",
         type=Path,
@@ -572,10 +572,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 if args.blocked_phrase_file
                 else None
             ),
-            buyer_intent_phrases=(
-                load_phrase_file(args.buyer_intent_file) if args.buyer_intent_file else None
-            ),
             confirmed_brands=(load_phrase_file(args.brand_file) if args.brand_file else None),
+            irrelevant_keywords=(
+                load_phrase_file(args.irrelevant_keyword_file)
+                if args.irrelevant_keyword_file
+                else None
+            ),
         )
         if args.detail_output:
             write_filtered_ads_csv(table, filtered_rows, args.detail_output)

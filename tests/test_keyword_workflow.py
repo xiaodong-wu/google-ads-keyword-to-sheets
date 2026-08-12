@@ -19,9 +19,10 @@ class CsvPreparationTests(unittest.TestCase):
 Keyword,Avg. monthly searches,Three month change,YoY change,Competition,Competition (indexed value),Top of page bid (low range),Top of page bid (high range)
 watch,100000,10%,20%,High,90,1.10,4.50
 watch wholesale,1200,5%,12%,Medium,55,2.20,6.80
-watch repair supplier,900,1%,2%,Low,20,0.80,2.10
+watch price supplier,900,1%,2%,Low,20,0.80,2.10
 custom watch,700,-2%,4%,High,78,1.90,5.40
 rolex custom watch,500,3%,8%,High,88,2.50,7.20
+luxury watch,450,2%,6%,Medium,45,1.50,4.20
 WATCH WHOLESALE,1100,4%,11%,Medium,53,2.10,6.60
 """
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -29,7 +30,9 @@ WATCH WHOLESALE,1100,4%,11%,Medium,53,2.10,6.60
             ads_csv = temp_path / "ideas.csv"
             detailed_csv = temp_path / "watch-filtered.csv"
             prepared_json = temp_path / "prepared.json"
+            irrelevant_file = temp_path / "irrelevant.txt"
             ads_csv.write_text(csv_text, encoding="utf-8-sig")
+            irrelevant_file.write_text("luxury watch\n", encoding="utf-8")
 
             exit_code = workflow.main(
                 [
@@ -38,6 +41,8 @@ WATCH WHOLESALE,1100,4%,11%,Medium,53,2.10,6.60
                     str(ads_csv),
                     "--seed",
                     "watch",
+                    "--irrelevant-keyword-file",
+                    str(irrelevant_file),
                     "--detail-output",
                     str(detailed_csv),
                     "--output",
@@ -75,15 +80,18 @@ WATCH WHOLESALE,1100,4%,11%,Medium,53,2.10,6.60
         self.assertEqual(prepared["stats"]["seed_excluded"], 1)
         self.assertEqual(prepared["stats"]["blocked_phrase_excluded"], 1)
         self.assertEqual(prepared["stats"]["confirmed_brand_excluded"], 1)
+        self.assertEqual(prepared["stats"]["irrelevant_keyword_excluded"], 1)
         self.assertEqual(prepared["stats"]["duplicate_export_excluded"], 1)
 
     def test_detailed_export_cannot_overwrite_source(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             ads_csv = Path(temp_dir) / "ideas.csv"
+            irrelevant_file = Path(temp_dir) / "irrelevant.txt"
             ads_csv.write_text(
                 "Keyword,Avg. monthly searches\nwatch wholesale,100\n",
                 encoding="utf-8",
             )
+            irrelevant_file.write_text("", encoding="utf-8")
             with contextlib.redirect_stderr(io.StringIO()):
                 exit_code = workflow.main(
                     [
@@ -92,6 +100,8 @@ WATCH WHOLESALE,1100,4%,11%,Medium,53,2.10,6.60
                         str(ads_csv),
                         "--seed",
                         "watch",
+                        "--irrelevant-keyword-file",
+                        str(irrelevant_file),
                         "--detail-output",
                         str(ads_csv),
                     ]
@@ -104,11 +114,13 @@ WATCH WHOLESALE,1100,4%,11%,Medium,53,2.10,6.60
             temp_path = Path(temp_dir)
             ads_csv = temp_path / "ideas.csv"
             detailed_csv = temp_path / "existing.csv"
+            irrelevant_file = temp_path / "irrelevant.txt"
             ads_csv.write_text(
                 "Keyword,Avg. monthly searches\nwatch wholesale,100\n",
                 encoding="utf-8",
             )
             detailed_csv.write_text("user data\n", encoding="utf-8")
+            irrelevant_file.write_text("", encoding="utf-8")
             with contextlib.redirect_stderr(io.StringIO()):
                 exit_code = workflow.main(
                     [
@@ -117,6 +129,8 @@ WATCH WHOLESALE,1100,4%,11%,Medium,53,2.10,6.60
                         str(ads_csv),
                         "--seed",
                         "watch",
+                        "--irrelevant-keyword-file",
+                        str(irrelevant_file),
                         "--detail-output",
                         str(detailed_csv),
                     ]
@@ -210,38 +224,64 @@ pea protein wholesale,30
             with self.assertRaises(workflow.KeywordWorkflowError):
                 workflow.parse_ads_csv(path)
 
-    def test_filters_low_intent_brands_and_requires_buyer_intent(self):
+    def test_filters_new_low_value_phrases_brands_and_imprecise_keywords(self):
         exported = [
             "watch wholesale",
             "WATCH WHOLESALE",
-            "custom watch sale",
+            "watch price",
+            "watch cost",
+            "old watch",
+            "watch near me",
+            "watch for me",
+            "gold watch",
+            "metal watch",
+            "nearly indestructible watch",
             "watch repair supplier",
-            "local watch manufacturer",
             "custom watch",
             "luxury watch",
             "rolex watch supplier",
-            "watch wholesale near me",
-            "watch wholesaler",
-            "how-to-build custom watch",
-            "open-source watch supplier",
+            "amazon watch",
+            "free watch",
+            "watch sale",
         ]
 
         result = workflow.prepare_keyword_ideas(
             exported,
             seed="watch",
             existing_keywords=[],
+            irrelevant_keywords=["luxury watch"],
         )
 
         self.assertEqual(
             result["new_keywords"],
-            ["watch wholesale", "custom watch", "watch wholesaler"],
+            [
+                "watch wholesale",
+                "gold watch",
+                "metal watch",
+                "nearly indestructible watch",
+                "watch repair supplier",
+                "custom watch",
+                "free watch",
+                "watch sale",
+            ],
         )
         self.assertEqual(result["stats"]["duplicate_export_excluded"], 1)
-        self.assertEqual(result["stats"]["blocked_phrase_excluded"], 6)
-        self.assertEqual(result["stats"]["confirmed_brand_excluded"], 1)
-        self.assertEqual(result["stats"]["buyer_intent_excluded"], 1)
+        self.assertEqual(result["stats"]["blocked_phrase_excluded"], 5)
+        self.assertEqual(result["stats"]["confirmed_brand_excluded"], 2)
+        self.assertEqual(result["stats"]["irrelevant_keyword_excluded"], 1)
 
-    def test_non_english_requires_localized_filter_lists(self):
+    def test_imprecise_filter_uses_exact_full_keyword_matching(self):
+        result = workflow.prepare_keyword_ideas(
+            ["watch-parts", "custom watch parts", "luxury watch"],
+            seed="watch",
+            existing_keywords=[],
+            irrelevant_keywords=["watch parts"],
+        )
+
+        self.assertEqual(result["new_keywords"], ["custom watch parts", "luxury watch"])
+        self.assertEqual(result["stats"]["irrelevant_keyword_excluded"], 1)
+
+    def test_non_english_requires_localized_blocked_list(self):
         with self.assertRaises(workflow.KeywordWorkflowError):
             workflow.prepare_keyword_ideas(
                 ["relojes al por mayor"],
@@ -253,42 +293,50 @@ pea protein wholesale,30
         result = workflow.prepare_keyword_ideas(
             [
                 "relojes al por mayor",
-                "relojes gratis al por mayor",
+                "relojes precio",
                 "rolex relojes al por mayor",
                 "relojes elegantes",
             ],
             seed="relojes",
             existing_keywords=[],
             language="Spanish",
-            blocked_phrases=["gratis"],
-            buyer_intent_phrases=["al por mayor"],
+            blocked_phrases=["precio"],
             confirmed_brands=[],
+            irrelevant_keywords=["relojes elegantes"],
         )
 
         self.assertEqual(result["new_keywords"], ["relojes al por mayor"])
         self.assertEqual(result["stats"]["blocked_phrase_excluded"], 1)
         self.assertEqual(result["stats"]["confirmed_brand_excluded"], 1)
-        self.assertEqual(result["stats"]["buyer_intent_excluded"], 1)
+        self.assertEqual(result["stats"]["irrelevant_keyword_excluded"], 1)
 
     def test_unsegmented_language_uses_localized_phrase_containment(self):
         result = workflow.prepare_keyword_ideas(
-            ["手表批发", "手表批发免费", "劳力士手表批发", "普通手表"],
+            ["手表批发", "手表附近", "劳力士手表批发", "普通手表"],
             seed="手表",
             existing_keywords=[],
             language="Chinese",
-            blocked_phrases=["免费"],
-            buyer_intent_phrases=["批发"],
+            blocked_phrases=["附近"],
             confirmed_brands=["劳力士"],
+            irrelevant_keywords=["普通手表"],
         )
 
         self.assertEqual(result["new_keywords"], ["手表批发"])
         self.assertEqual(result["stats"]["blocked_phrase_excluded"], 1)
         self.assertEqual(result["stats"]["confirmed_brand_excluded"], 1)
-        self.assertEqual(result["stats"]["buyer_intent_excluded"], 1)
+        self.assertEqual(result["stats"]["irrelevant_keyword_excluded"], 1)
 
     def test_parser_and_workflow_defaults(self):
         args = workflow.build_parser().parse_args(
-            ["prepare", "--ads-csv", "ideas.csv", "--seed", "watch"]
+            [
+                "prepare",
+                "--ads-csv",
+                "ideas.csv",
+                "--seed",
+                "watch",
+                "--irrelevant-keyword-file",
+                "irrelevant.txt",
+            ]
         )
         self.assertEqual(args.language, "English")
         self.assertEqual(workflow.DEFAULT_LANGUAGE, "English")
@@ -372,10 +420,12 @@ class SkillInstructionContractTests(unittest.TestCase):
         self.assertIn("Default `language` to `English`", skill_text)
         self.assertIn("`location` to `All locations`", skill_text)
         self.assertIn("Set targeting language to the requested language.", skill_text)
-        self.assertRegex(skill_text, r"`sale` does not\s+match `wholesale`")
-        self.assertIn("Keep only phrases containing", policy_text)
+        self.assertIn("does not require a", skill_text)
+        self.assertRegex(skill_text, r"`me` does not match\s+`metal`")
+        self.assertIn("Do not require wholesale", policy_text)
+        self.assertIn("--irrelevant-keyword-file", policy_text)
         self.assertIn("confirmed-brands.txt", policy_text)
-        self.assertIn("The helper refuses a non-English run", policy_text)
+        self.assertIn("refuses a non-English run", policy_text)
 
     def test_domain_selects_sheets_and_missing_domain_selects_detailed_export(self):
         skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")

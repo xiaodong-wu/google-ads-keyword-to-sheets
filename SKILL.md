@@ -1,9 +1,9 @@
 ---
 name: google-ads-keyword-to-sheets
-description: Fetch Google Ads Keyword Planner ideas for one seed, optional language, and optional geographic location, then filter them to wholesale, bulk-purchase, and customization intent while excluding low-intent phrases and confirmed brands. When a domain is provided, append unique keywords to its matching tab in the configured Automatically publish articles Google Sheet. When no domain is provided, export a filtered local CSV that retains search volume, competition, bid ranges, and every other Google Ads source column. Language defaults to English and location defaults to All locations. Never use the domain as a Google Ads website seed or site filter. Use for live runs, dry-runs, detailed keyword exports, or updates to this workflow.
+description: Fetch Google Ads Keyword Planner ideas for one seed, optional language, and optional geographic location, then remove low-value phrases such as near, me, price, cost, and old, confirmed brands, and topically imprecise ideas. When a domain is provided, append unique keywords to its matching tab in the configured Automatically publish articles Google Sheet. When no domain is provided, export a filtered local CSV that retains search volume, competition, bid ranges, and every other Google Ads source column. Language defaults to English and location defaults to All locations. Never use the domain as a Google Ads website seed or site filter. Use for live runs, dry-runs, detailed keyword exports, or updates to this workflow.
 ---
 
-# Google Ads Keyword Ideas to Sheets or CSV
+# Precise Google Ads Keyword Ideas to Sheets or CSV
 
 Run one auditable Keyword Planner job. Accept exactly one `keyword`, optional `language`, optional
 `location`, optional `domain`, and optional `dry-run`. Default `language` to `English` and
@@ -42,8 +42,8 @@ local CSV.
    - When `domain` is absent, select detailed export mode. Never substitute
      `www.nutricdmo.com` or any other default domain.
    - Create a temporary run directory with `mktemp -d`. Keep the source Ads CSV, parser JSON,
-     localized filter files, optional confirmed-brand addendum, and—only in Sheets mode—an
-     A-column-only keyword snapshot there.
+     localized filter files, optional confirmed-brand addendum, the required run-specific
+     imprecise-keyword file, and—only in Sheets mode—an A-column-only keyword snapshot there.
    - In detailed export mode, choose a durable workspace path ending in `.csv` for the final file.
      Do not place the final deliverable only in a temporary directory.
 
@@ -79,10 +79,16 @@ local CSV.
 4. **Download and filter all ideas**
    - Open **Download keyword ideas**, start `waitForEvent("download")`, choose `.csv`, await the
      download, and get its local path with `download.path({timeoutMs: 30000})`.
-   - Use bundled English filter lists for English. For another language, create complete localized
-     blocked-phrase and buyer-intent files according to `references/keyword-filter-policy.md`.
+   - Use the bundled English blocked-phrase list for English. For another language, create a
+     complete localized blocked-phrase file according to
+     `references/keyword-filter-policy.md`.
    - Inspect ideas for additional unambiguous brands. If found, put one confirmed brand phrase per
      line in a temporary file and pass it with `--brand-file`. Keep ambiguous terms.
+   - Review every remaining idea for topical precision. Keep only ideas directly about the seed
+     product, service, category, or an unambiguous close synonym. Put each broad, adjacent,
+     different-intent, or uncertain full keyword into a temporary one-keyword-per-line file and
+     pass it with `--irrelevant-keyword-file`. Pass an empty file when every remaining idea is
+     precise.
    - Preserve Google Ads relevance order. Never sort or recompute search volume, competition, bid,
      trend, or other metrics.
 
@@ -96,6 +102,7 @@ local CSV.
      --seed <exact-seed-keyword> \
      --language <requested-language> \
      --existing-file <a-column-only-json> \
+     --irrelevant-keyword-file <exact-imprecise-keywords.txt> \
      --chunk-size 500 \
      --output <prepared-json>
    ```
@@ -107,17 +114,20 @@ local CSV.
      --ads-csv <downloaded-csv> \
      --seed <exact-seed-keyword> \
      --language <requested-language> \
+     --irrelevant-keyword-file <exact-imprecise-keywords.txt> \
      --detail-output <durable-workspace-path.csv> \
      --output <prepared-json>
    ```
 
-   For non-English runs, add both localized phrase-file options. Add `--brand-file` when needed.
-   During a detailed-export `dry-run`, omit `--detail-output` and report the planned path.
+   For non-English runs, add the localized `--blocked-phrase-file`. Add `--brand-file` when
+   needed. During a detailed-export `dry-run`, omit `--detail-output` and report the planned
+   path.
 
    The helper excludes the seed, wrong-script English phrases, within-export duplicates, blocked
-   phrases, confirmed brands, and ideas without wholesale/bulk/custom intent. Sheets mode also
-   excludes existing A-column values. Matching uses normalized boundaries, so `sale` does not
-   match `wholesale`.
+   phrases, confirmed brands, and exact run-specific imprecise keywords. It does not require a
+   wholesale, bulk, supplier, manufacturer, or customization marker. Sheets mode also excludes
+   existing A-column values. Matching uses normalized boundaries, so `me` does not match
+   `metal`, `near` does not match `nearly`, and `old` does not match `gold`.
 
 6. **Complete Sheets mode**
    - Immediately re-read A before a live write, refresh the snapshot, and rerun the parser.
@@ -141,7 +151,8 @@ local CSV.
 
 8. **Finish and report**
    - Finalize Chrome tabs according to the Chrome skill.
-   - Report seed, language, location, source count, every exclusion count, and retained count.
+   - Report seed, language, location, source count, every exclusion count—including topically
+     imprecise ideas—and retained count.
    - In Sheets mode, also report normalized domain, appended count, verified ranges, and observed
      spreadsheet URL without exposing column E.
    - In detailed export mode, report the local file path, retained detail rows, and preserved source
@@ -151,8 +162,8 @@ local CSV.
 
 - Do not fall back to web search, invented ideas, or Google Ads API results.
 - Do not submit or export while a website/site filter is active.
-- Do not write when browser targeting, CSV header, filter localization, or brand judgment is
-  uncertain.
+- Do not write when browser targeting, CSV header, filter localization, brand judgment, or topical
+  precision is uncertain.
 - In Sheets mode, also stop when the spreadsheet title, tab, headers, template, destination
   emptiness, or readback is uncertain. Do not create a Sheet or tab and do not modify F:H.
 - In detailed export mode, do not discard, transform, estimate, or merge metric values. Do not
