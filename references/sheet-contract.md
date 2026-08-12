@@ -6,10 +6,11 @@
 - Spreadsheet ID: `1n-J4tu5IfiaVQI9496hRzlFNKLwXNQLDQY_HZAf1UmM`
 - Spreadsheet URL:
   `https://docs.google.com/spreadsheets/d/1n-J4tu5IfiaVQI9496hRzlFNKLwXNQLDQY_HZAf1UmM/edit`
-- Default domain tab: `www.nutricdmo.com`
+- Known tab example: `www.nutricdmo.com`
 
 Normalize the user-supplied domain to a lowercase ASCII hostname while preserving `www`. Require an
-exact visible tab-title match. Do not create a missing tab.
+exact visible tab-title match. Do not create a missing tab. Use this contract only when the user
+explicitly supplied a domain; never select the example tab for a no-domain run.
 
 ## Required headers
 

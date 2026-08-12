@@ -1,0 +1,87 @@
+# Conservative, unambiguous brand names. Add run-specific confirmed brands with --brand-file.
+adidas
+alibaba
+apple watch
+audemars piguet
+baume mercier
+blancpain
+breitling
+breguet watch
+bulova
+cartier watch
+casio
+cellucor
+chopard watch
+coros watch
+costco
+daniel wellington
+dhgate
+dior watch
+dymatize
+etsy
+fitbit
+fossil watch
+franck muller
+frederique constant
+g shock
+garden of life
+garmin
+ghost lifestyle
+girard perregaux
+glashutte original
+google pixel watch
+grand seiko
+gucci watch
+hamilton watch
+hublot
+huawei
+isopure
+invicta watch
+iwc watch
+jaeger lecoultre
+kaged supplements
+legion athletics
+longines
+maurice lacroix
+michael kors
+montblanc watch
+movado
+musclepharm
+muscletech
+myprotein
+naked nutrition
+nike
+nomos glashutte
+omega watch
+optimum nutrition
+orgain
+orient watch
+oris watch
+panerai
+patek philippe
+piaget watch
+polar watch
+premier protein
+puma
+quest nutrition
+rado watch
+raymond weil
+richard mille
+rolex
+samsung
+seiko
+shein
+sinn watch
+sony
+suunto
+swatch watch
+tag heuer
+temu
+timex
+tissot
+transparent labs
+tudor watch
+ulysse nardin
+vacheron constantin
+xiaomi
+zenith watch

@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import sys
 import tempfile
@@ -12,6 +14,118 @@ import keyword_workflow as workflow  # noqa: E402
 
 
 class CsvPreparationTests(unittest.TestCase):
+    def test_detailed_export_preserves_metrics_and_google_ads_metadata(self):
+        csv_text = """Currency,USD
+Keyword,Avg. monthly searches,Three month change,YoY change,Competition,Competition (indexed value),Top of page bid (low range),Top of page bid (high range)
+watch,100000,10%,20%,High,90,1.10,4.50
+watch wholesale,1200,5%,12%,Medium,55,2.20,6.80
+watch repair supplier,900,1%,2%,Low,20,0.80,2.10
+custom watch,700,-2%,4%,High,78,1.90,5.40
+rolex custom watch,500,3%,8%,High,88,2.50,7.20
+WATCH WHOLESALE,1100,4%,11%,Medium,53,2.10,6.60
+"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            ads_csv = temp_path / "ideas.csv"
+            detailed_csv = temp_path / "watch-filtered.csv"
+            prepared_json = temp_path / "prepared.json"
+            ads_csv.write_text(csv_text, encoding="utf-8-sig")
+
+            exit_code = workflow.main(
+                [
+                    "prepare",
+                    "--ads-csv",
+                    str(ads_csv),
+                    "--seed",
+                    "watch",
+                    "--detail-output",
+                    str(detailed_csv),
+                    "--output",
+                    str(prepared_json),
+                ]
+            )
+            output_rows = workflow.read_csv_rows(detailed_csv)
+            prepared = json.loads(prepared_json.read_text(encoding="utf-8"))
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(output_rows[0], ["Currency", "USD"])
+        self.assertEqual(
+            output_rows[1],
+            [
+                "Keyword",
+                "Avg. monthly searches",
+                "Three month change",
+                "YoY change",
+                "Competition",
+                "Competition (indexed value)",
+                "Top of page bid (low range)",
+                "Top of page bid (high range)",
+            ],
+        )
+        self.assertEqual(
+            output_rows[2:],
+            [
+                ["watch wholesale", "1200", "5%", "12%", "Medium", "55", "2.20", "6.80"],
+                ["custom watch", "700", "-2%", "4%", "High", "78", "1.90", "5.40"],
+            ],
+        )
+        self.assertEqual(prepared["new_keywords"], ["watch wholesale", "custom watch"])
+        self.assertEqual(prepared["stats"]["detail_row_count"], 2)
+        self.assertEqual(prepared["stats"]["detail_column_count"], 8)
+        self.assertEqual(prepared["stats"]["seed_excluded"], 1)
+        self.assertEqual(prepared["stats"]["blocked_phrase_excluded"], 1)
+        self.assertEqual(prepared["stats"]["confirmed_brand_excluded"], 1)
+        self.assertEqual(prepared["stats"]["duplicate_export_excluded"], 1)
+
+    def test_detailed_export_cannot_overwrite_source(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            ads_csv = Path(temp_dir) / "ideas.csv"
+            ads_csv.write_text(
+                "Keyword,Avg. monthly searches\nwatch wholesale,100\n",
+                encoding="utf-8",
+            )
+            with contextlib.redirect_stderr(io.StringIO()):
+                exit_code = workflow.main(
+                    [
+                        "prepare",
+                        "--ads-csv",
+                        str(ads_csv),
+                        "--seed",
+                        "watch",
+                        "--detail-output",
+                        str(ads_csv),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 2)
+
+    def test_detailed_export_does_not_overwrite_existing_file(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            ads_csv = temp_path / "ideas.csv"
+            detailed_csv = temp_path / "existing.csv"
+            ads_csv.write_text(
+                "Keyword,Avg. monthly searches\nwatch wholesale,100\n",
+                encoding="utf-8",
+            )
+            detailed_csv.write_text("user data\n", encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()):
+                exit_code = workflow.main(
+                    [
+                        "prepare",
+                        "--ads-csv",
+                        str(ads_csv),
+                        "--seed",
+                        "watch",
+                        "--detail-output",
+                        str(detailed_csv),
+                    ]
+                )
+            retained_text = detailed_csv.read_text(encoding="utf-8")
+
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(retained_text, "user data\n")
+
     def test_chinese_header_bom_preamble_and_exclusions(self):
         csv_text = """关键字提示
 货币,USD
@@ -20,17 +134,20 @@ protein powder,100
 PROTEIN   POWDER,90
 维生素,80
 ,70
-whey protein,60
-WHEY  PROTEIN,50
-collagen powder,40
-pea protein,30
+whey protein supplier,60
+WHEY  PROTEIN SUPPLIER,50
+collagen powder supplier,40
+pea protein wholesale,30
 """
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             ads_csv = temp_path / "ideas.csv"
             existing = temp_path / "existing.json"
             ads_csv.write_text(csv_text, encoding="utf-8-sig")
-            existing.write_text(json.dumps(["核心关键字", "collagen powder"]), encoding="utf-8")
+            existing.write_text(
+                json.dumps(["核心关键字", "collagen powder supplier"]),
+                encoding="utf-8",
+            )
 
             exported, csv_stats = workflow.parse_ads_csv(ads_csv)
             result = workflow.prepare_keyword_ideas(
@@ -40,7 +157,10 @@ pea protein,30
                 chunk_size=1,
             )
 
-        self.assertEqual(result["new_keywords"], ["whey protein", "pea protein"])
+        self.assertEqual(
+            result["new_keywords"],
+            ["whey protein supplier", "pea protein wholesale"],
+        )
         self.assertEqual(csv_stats["header_row"], 3)
         self.assertEqual(csv_stats["empty_excluded"], 1)
         self.assertEqual(result["stats"]["parsed_count"], 7)
@@ -48,30 +168,39 @@ pea protein,30
         self.assertEqual(result["stats"]["non_english_excluded"], 1)
         self.assertEqual(result["stats"]["duplicate_export_excluded"], 1)
         self.assertEqual(result["stats"]["existing_excluded"], 1)
-        self.assertEqual(result["chunks"], [["whey protein"], ["pea protein"]])
+        self.assertEqual(
+            result["chunks"],
+            [["whey protein supplier"], ["pea protein wholesale"]],
+        )
 
     def test_english_header_utf16_tab_delimited_and_nested_existing_values(self):
-        csv_text = "Report\tGoogle Ads\nKeyword\tAvg. monthly searches\nAlpha tool\t100\nBeta tool\t80\nGamma tool\t60\n"
+        csv_text = (
+            "Report\tGoogle Ads\n"
+            "Keyword\tAvg. monthly searches\n"
+            "Alpha tool supplier\t100\n"
+            "Beta tool supplier\t80\n"
+            "Gamma tool manufacturer\t60\n"
+        )
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             ads_csv = temp_path / "ideas.csv"
             existing = temp_path / "existing.json"
             ads_csv.write_bytes(csv_text.encode("utf-16"))
             existing.write_text(
-                json.dumps({"values": [["核心关键字"], ["Beta tool"]]}),
+                json.dumps({"values": [["核心关键字"], ["Beta tool supplier"]]}),
                 encoding="utf-8",
             )
 
             exported, stats = workflow.parse_ads_csv(ads_csv)
             result = workflow.prepare_keyword_ideas(
                 exported,
-                seed="Alpha tool",
+                seed="Alpha tool supplier",
                 existing_keywords=workflow.load_existing_keywords(existing),
                 chunk_size=2,
             )
 
         self.assertEqual(stats["keyword_column"], 1)
-        self.assertEqual(result["new_keywords"], ["Gamma tool"])
+        self.assertEqual(result["new_keywords"], ["Gamma tool manufacturer"])
         self.assertEqual(result["stats"]["new_count"], 1)
 
     def test_missing_keyword_header_is_rejected(self):
@@ -80,6 +209,90 @@ pea protein,30
             path.write_text("Name,Volume\nalpha,10\n", encoding="utf-8")
             with self.assertRaises(workflow.KeywordWorkflowError):
                 workflow.parse_ads_csv(path)
+
+    def test_filters_low_intent_brands_and_requires_buyer_intent(self):
+        exported = [
+            "watch wholesale",
+            "WATCH WHOLESALE",
+            "custom watch sale",
+            "watch repair supplier",
+            "local watch manufacturer",
+            "custom watch",
+            "luxury watch",
+            "rolex watch supplier",
+            "watch wholesale near me",
+            "watch wholesaler",
+            "how-to-build custom watch",
+            "open-source watch supplier",
+        ]
+
+        result = workflow.prepare_keyword_ideas(
+            exported,
+            seed="watch",
+            existing_keywords=[],
+        )
+
+        self.assertEqual(
+            result["new_keywords"],
+            ["watch wholesale", "custom watch", "watch wholesaler"],
+        )
+        self.assertEqual(result["stats"]["duplicate_export_excluded"], 1)
+        self.assertEqual(result["stats"]["blocked_phrase_excluded"], 6)
+        self.assertEqual(result["stats"]["confirmed_brand_excluded"], 1)
+        self.assertEqual(result["stats"]["buyer_intent_excluded"], 1)
+
+    def test_non_english_requires_localized_filter_lists(self):
+        with self.assertRaises(workflow.KeywordWorkflowError):
+            workflow.prepare_keyword_ideas(
+                ["relojes al por mayor"],
+                seed="relojes",
+                existing_keywords=[],
+                language="Spanish",
+            )
+
+        result = workflow.prepare_keyword_ideas(
+            [
+                "relojes al por mayor",
+                "relojes gratis al por mayor",
+                "rolex relojes al por mayor",
+                "relojes elegantes",
+            ],
+            seed="relojes",
+            existing_keywords=[],
+            language="Spanish",
+            blocked_phrases=["gratis"],
+            buyer_intent_phrases=["al por mayor"],
+            confirmed_brands=[],
+        )
+
+        self.assertEqual(result["new_keywords"], ["relojes al por mayor"])
+        self.assertEqual(result["stats"]["blocked_phrase_excluded"], 1)
+        self.assertEqual(result["stats"]["confirmed_brand_excluded"], 1)
+        self.assertEqual(result["stats"]["buyer_intent_excluded"], 1)
+
+    def test_unsegmented_language_uses_localized_phrase_containment(self):
+        result = workflow.prepare_keyword_ideas(
+            ["手表批发", "手表批发免费", "劳力士手表批发", "普通手表"],
+            seed="手表",
+            existing_keywords=[],
+            language="Chinese",
+            blocked_phrases=["免费"],
+            buyer_intent_phrases=["批发"],
+            confirmed_brands=["劳力士"],
+        )
+
+        self.assertEqual(result["new_keywords"], ["手表批发"])
+        self.assertEqual(result["stats"]["blocked_phrase_excluded"], 1)
+        self.assertEqual(result["stats"]["confirmed_brand_excluded"], 1)
+        self.assertEqual(result["stats"]["buyer_intent_excluded"], 1)
+
+    def test_parser_and_workflow_defaults(self):
+        args = workflow.build_parser().parse_args(
+            ["prepare", "--ads-csv", "ideas.csv", "--seed", "watch"]
+        )
+        self.assertEqual(args.language, "English")
+        self.assertEqual(workflow.DEFAULT_LANGUAGE, "English")
+        self.assertEqual(workflow.DEFAULT_LOCATION, "All locations")
 
 
 class SheetPlanningTests(unittest.TestCase):
@@ -145,10 +358,40 @@ class SkillInstructionContractTests(unittest.TestCase):
             "Clear the optional website-filter field if it contains any value and leave it empty.",
             skill_text,
         )
-        self.assertIn("no active website/site filter", skill_text)
+        self.assertRegex(skill_text, r"no\s+active website/site filter")
         self.assertNotIn("Build the website seed", skill_text)
         self.assertNotIn("fill the website-filter field with the website seed", skill_text)
         self.assertIn("The supplied domain is a destination-tab selector only.", readme_text)
+
+    def test_language_location_and_filter_contract(self):
+        skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        policy_text = (SKILL_ROOT / "references/keyword-filter-policy.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("Default `language` to `English`", skill_text)
+        self.assertIn("`location` to `All locations`", skill_text)
+        self.assertIn("Set targeting language to the requested language.", skill_text)
+        self.assertRegex(skill_text, r"`sale` does not\s+match `wholesale`")
+        self.assertIn("Keep only phrases containing", policy_text)
+        self.assertIn("confirmed-brands.txt", policy_text)
+        self.assertIn("The helper refuses a non-English run", policy_text)
+
+    def test_domain_selects_sheets_and_missing_domain_selects_detailed_export(self):
+        skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        export_contract = (SKILL_ROOT / "references/detail-export-contract.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("Do not default a missing domain.", skill_text)
+        self.assertIn("When `domain` is present", skill_text)
+        self.assertIn("When `domain` is absent", skill_text)
+        self.assertIn("do not access Google Drive or Google Sheets", skill_text)
+        self.assertIn("--detail-output <durable-workspace-path.csv>", skill_text)
+        self.assertIn("Preserve the complete source header", export_contract)
+        self.assertIn("average monthly searches", export_contract)
+        self.assertIn("low-range top-of-page bid", export_contract)
+        self.assertIn("Every detail cell exactly matches", export_contract)
 
     def test_user_facing_skill_copy_is_english(self):
         for relative_path in ("SKILL.md", "README.md", "agents/openai.yaml"):

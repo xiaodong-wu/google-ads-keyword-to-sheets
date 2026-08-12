@@ -1,0 +1,94 @@
+# One normalized English phrase per line. Matching uses whole token boundaries.
+free
+download
+downloads
+downloadable
+downloading
+downloaded
+pdf
+pdfs
+crack
+cracked
+cracking
+diy
+how to make
+how to build
+opensource
+open source
+job
+jobs
+career
+careers
+salary
+salaries
+hiring
+employment
+resume
+resumes
+internship
+internships
+work from home
+training
+trainings
+course
+courses
+second hand
+secondhand
+refurbished
+rebuilt
+surplus
+amazon
+ebay
+aliexpress
+walmart
+retail
+retailer
+retailers
+retailing
+piece
+pieces
+repair
+repairs
+repairing
+fix
+fixed
+fixes
+fixing
+troubleshooting
+manual
+manuals
+replacement part
+replacement parts
+service center
+service centers
+warranty
+warranties
+what is
+definition
+definitions
+history
+wiki
+wikipedia
+thesis
+research paper
+research papers
+price
+prices
+pricing
+cost
+costs
+cheap
+affordable
+discount
+discounts
+discounted
+sale
+sales
+near me
+near
+nearly
+local
+store
+stores
+shop
+shops

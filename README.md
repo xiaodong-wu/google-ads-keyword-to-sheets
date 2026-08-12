@@ -1,26 +1,29 @@
 # Google Ads Keyword Ideas to Google Sheets
 
-A Codex skill that collects all unique English keyword ideas from the signed-in Google Ads Keyword Planner in Chrome and appends them to the matching domain tab in the configured **Automatically publish articles** Google Sheet.
+A Codex skill that collects keyword ideas from the signed-in Google Ads Keyword Planner in Chrome and keeps wholesale, bulk-purchase, and customization intent. When a domain is supplied it appends unique keywords to the matching tab in the configured **Automatically publish articles** Google Sheet; without a domain it exports a local filtered CSV containing each retained keyword and all of its Google Ads metrics.
 
 The workflow uses the visible Google Ads interface and a one-time CSV export. It does not use the Google Ads API or generate keyword suggestions from another source.
 
-The supplied domain is a destination-tab selector only. The skill never enters it, or a URL derived from it, into the Google Ads website filter.
+The supplied domain is a destination-tab selector only. The skill never enters it, or a URL derived from it, into the Google Ads website filter. A missing domain is never replaced with a default domain.
 
 ## What it does
 
-- Accepts one seed keyword, one geographic location, one destination-tab domain, and an optional `dry-run` flag.
-- Configures Keyword Planner for English, Google Search, the past 12 months, and the requested location, with no website/site filter.
+- Accepts one seed keyword, an optional language, optional location, optional destination-tab domain, and an optional `dry-run` flag.
+- Defaults language to English and location to All locations; configures Keyword Planner for the selected language and location, Google Search, and the past 12 months, with no website/site filter.
 - Downloads all keyword ideas as CSV and preserves Google Ads relevance order.
-- Normalizes text with NFKC, removes duplicate ideas, excludes the seed keyword, filters non-Latin-script phrases, and removes keywords already present in the destination tab.
-- Appends at most 500 rows per batch and verifies every written range.
+- Normalizes text with NFKC and whole-token phrase matching, then removes blocked low-intent phrases and confirmed brands.
+- Keeps only ideas containing a wholesale, bulk-purchase, B2B, or customization marker, and removes the seed, duplicates, and keywords already present in the destination tab.
+- With a domain, appends at most 500 rows per batch and verifies every written range.
 - Copies the latest complete C–E template row inside Google Sheets, writes the keyword and location to A–B, and leaves F–H blank.
+- Without a domain, writes a UTF-8 CSV containing the original Google Ads metadata, complete header, and full metric row for every retained keyword, including search volume, competition, and bid ranges.
 - Keeps the publishing key inside Google Sheets and out of local files, logs, commands, and reports.
 
 ## Requirements
 
-- Codex Desktop with access to the Chrome, Google Drive, and Google Sheets integrations.
+- Codex Desktop with access to the Chrome integration.
+- For Sheets mode, access to the Google Drive and Google Sheets integrations.
 - A Chrome session signed in to an account that can use Google Ads Keyword Planner and export keyword ideas.
-- Access to the configured Google Sheet and an existing tab whose name exactly matches the normalized domain.
+- For Sheets mode, access to the configured Google Sheet and an existing tab whose name exactly matches the normalized domain.
 - Python 3.9 or later for the CSV preparation helper and tests.
 
 ## Installation
@@ -38,18 +41,26 @@ Restart Codex if the skill is not discovered immediately.
 Run a read-only dry run first:
 
 ```text
-$google-ads-keyword-to-sheets keyword="protein powder" location="United States" domain="www.nutricdmo.com" dry-run
+$google-ads-keyword-to-sheets keyword="protein powder" language="English" location="United States" domain="www.nutricdmo.com" dry-run
 ```
 
 Run the live workflow after reviewing the planned destination range:
 
 ```text
-$google-ads-keyword-to-sheets keyword="protein powder" location="United States" domain="www.nutricdmo.com"
+$google-ads-keyword-to-sheets keyword="protein powder" language="English" location="United States" domain="www.nutricdmo.com"
 ```
 
-The domain defaults to `www.nutricdmo.com` when omitted and is used only to match the Google Sheets tab. It is not used in the Google Ads query. Each run accepts exactly one seed keyword. If Google Ads shows multiple plausible geographic matches, the skill pauses for the user to select one.
+Export a detailed local CSV instead of using Google Sheets by omitting the domain:
 
-## Destination contract
+```text
+$google-ads-keyword-to-sheets keyword="watch" language="English" location="All locations"
+```
+
+Language defaults to `English` and location defaults to `All locations`. The domain has no default: providing one selects Sheets mode, while omitting it selects detailed CSV export mode. A supplied domain is used only to match the Google Sheets tab and is never used in the Google Ads query. Each run accepts exactly one seed keyword. If Google Ads shows multiple plausible language or geographic matches, the skill pauses for the user to select one.
+
+The bundled filter phrases are English. A non-English run requires localized blocked-phrase and buyer-intent files so English-only filtering is never applied silently. See [`references/keyword-filter-policy.md`](references/keyword-filter-policy.md) for the exact filtering order, boundary matching, and conservative brand policy.
+
+## Sheets destination contract
 
 The destination spreadsheet is fixed. The normalized domain must exactly match an existing visible tab; the skill never creates a spreadsheet or tab and never reuses the domain as a Google Ads website input.
 
@@ -82,12 +93,26 @@ Prepare a Google Ads CSV against an optional A-column keyword snapshot:
 python3 scripts/keyword_workflow.py prepare \
   --ads-csv /path/to/keyword-ideas.csv \
   --seed "protein powder" \
+  --language "English" \
   --existing-file /path/to/existing-keywords.json \
   --chunk-size 500 \
   --output /path/to/prepared.json
 ```
 
-The helper supports English and Chinese keyword headers, BOMs, UTF-16 tab-delimited exports, and metadata rows before the CSV header.
+Create a filtered detailed CSV while preserving every Google Ads source column:
+
+```bash
+python3 scripts/keyword_workflow.py prepare \
+  --ads-csv /path/to/keyword-ideas.csv \
+  --seed "watch" \
+  --language "English" \
+  --detail-output /path/to/watch-google-ads-keywords.csv \
+  --output /path/to/prepared.json
+```
+
+For a non-English run, also pass localized `--blocked-phrase-file` and `--buyer-intent-file` inputs. Use `--brand-file` to add one unambiguous, run-specific brand phrase per line. English runs automatically load the bundled filter lists.
+
+The helper supports English and Chinese keyword headers, BOMs, UTF-16 tab-delimited exports, metadata rows before the CSV header, and punctuation-insensitive whole-token phrase matching. Detailed exports preserve all source metadata, headers, search-volume values, competition fields, low/high bid ranges, and any additional Google Ads columns. The helper reports separate counts for blocked phrases, confirmed brands, missing buyer intent, wrong-script English phrases, duplicates, and existing Sheet values.
 
 ## Validation
 
