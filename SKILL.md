@@ -30,7 +30,10 @@ local CSV.
   follow `google-drive:google-drive` and `google-drive:google-sheets` before any Sheet operation.
   Read their required existing-edit, live-read, native-cell, batch-update, and visual-verification
   references.
-- Load and follow `chrome:control-chrome` before any Google Ads browser action.
+- Before any Google Ads browser action, read
+  [references/browser-workflow.md](references/browser-workflow.md) and the selected browser
+  tool's current documentation. Use an available controller for Chrome, such as
+  `mcp__cua_repl`; `chrome:control-chrome` is optional, not a required dependency.
 
 ## Workflow
 
@@ -58,10 +61,12 @@ local CSV.
      E are all non-empty as the template. Treat E as secret and never repeat its value.
 
 3. **Run Google Ads Keyword Planner in Chrome**
-   - Name the Chrome session, then reuse or claim a signed-in `ads.google.com` Keyword Planner tab.
+   - Select an available Chrome controller using `references/browser-workflow.md`.
+     Reuse a signed-in `ads.google.com` Keyword Planner tab; name a new session if the tool
+     supports or requires it.
      If none exists, open `https://ads.google.com/aw/keywordplanner/home`.
    - If sign-in blocks the page, leave the tab as a handoff and ask the user to sign in. Follow the
-     Chrome skill for CAPTCHA and permission prompts.
+     selected tool's rules for CAPTCHA, permission prompts, and handoff.
    - Open **Discover new keywords**, select **Start with keywords**, remove previous keyword chips,
      and enter the one exact seed.
    - Clear the optional website-filter field if it contains any value and leave it empty. Never
@@ -77,8 +82,10 @@ local CSV.
      Stop when an ad blocker, dialog, or account state prevents the query or export.
 
 4. **Download and filter all ideas**
-   - Open **Download keyword ideas**, start `waitForEvent("download")`, choose `.csv`, await the
-     download, and get its local path with `download.path({timeoutMs: 30000})`.
+   - Open **Download keyword ideas** and choose `.csv`. Use only documented download APIs;
+     otherwise locate the completed export through the tool's supported Downloads UI or a
+     bounded check of the known local download directory, as described in
+     `references/browser-workflow.md`. Confirm the file belongs to this exact query before parsing.
    - Use the bundled English blocked-phrase list for English. For another language, create a
      complete localized blocked-phrase file according to
      `references/keyword-filter-policy.md`.
@@ -150,7 +157,7 @@ local CSV.
    - Return a clickable link to the local CSV and report its row and column counts.
 
 8. **Finish and report**
-   - Finalize Chrome tabs according to the Chrome skill.
+   - Finalize Chrome tabs according to the selected tool's documentation; preserve user-owned tabs.
    - Report seed, language, location, source count, every exclusion count—including topically
      imprecise ideas—and retained count.
    - In Sheets mode, also report normalized domain, appended count, verified ranges, and observed
@@ -160,6 +167,9 @@ local CSV.
 
 ## Failure rules
 
+- A missing optional browser skill is not a blocker when a supported Chrome controller is
+  available. Stop only for an actual access, targeting, query, download, or verification blocker;
+  record the exact unresolved step and preserve completed jobs.
 - Do not fall back to web search, invented ideas, or Google Ads API results.
 - Do not submit or export while a website/site filter is active.
 - Do not write when browser targeting, CSV header, filter localization, brand judgment, or topical

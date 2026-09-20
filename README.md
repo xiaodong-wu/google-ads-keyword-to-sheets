@@ -22,11 +22,19 @@ The supplied domain is a destination-tab selector only. The skill never enters i
 
 ## Requirements
 
-- Codex Desktop with access to the Chrome integration.
+- Codex Desktop with a supported Chrome controller, such as `mcp__cua_repl`. The older
+  `chrome:control-chrome` skill is optional; it is not required when a current Chrome controller
+  is available.
 - For Sheets mode, access to the Google Drive and Google Sheets integrations.
 - A Chrome session signed in to an account that can use Google Ads Keyword Planner and export keyword ideas.
 - For Sheets mode, access to the configured Google Sheet and an existing tab whose name exactly matches the normalized domain.
 - Python 3.9 or later for the CSV preparation helper and tests.
+
+The workflow follows the active controller's documented APIs. If it has no download-path API,
+it identifies the completed CSV through supported Downloads UI or bounded local download-file
+evidence, then verifies the source file before parsing. See
+[`references/browser-workflow.md`](references/browser-workflow.md). A missing optional skill does
+not require an extra approval merely to use an available Chrome controller for the same task.
 
 ## Installation
 
