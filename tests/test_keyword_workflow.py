@@ -1,4 +1,5 @@
 import contextlib
+import csv
 import io
 import json
 import sys
@@ -14,6 +15,33 @@ import keyword_workflow as workflow  # noqa: E402
 
 
 class CsvPreparationTests(unittest.TestCase):
+    def test_uneven_metadata_rows_preserve_full_metrics_for_each_delimiter(self):
+        headers = ["Keyword", "Currency", "Avg. monthly searches", "三个月变化",
+                   "年同比变化", "Competition", "Competition (indexed value)",
+                   "Top of page bid (low range)", "Top of page bid (high range)",
+                   "Ad impression share", "Organic impression share",
+                   "Organic average position", "In account?", "In plan?"]
+        headers += ["Searches: Month {}".format(i) for i in range(1, 13)]
+        preamble = [["Keyword Stats report"], ["2025年9月1日 - 2026年8月31日"]]
+        metric_row = ["industrial tool, supplier; custom", "CNY", "1,000", "-10%",
+                      "∞", "低", "14", "4.10", "42.70"] + [""] * 17
+        expected = preamble + [headers, metric_row]
+        for delimiter, encoding in (("\t", "utf-16"), (";", "utf-8-sig"), (",", "utf-8-sig")):
+            with self.subTest(delimiter=delimiter), tempfile.TemporaryDirectory() as tmp:
+                buffer = io.StringIO(newline="")
+                csv.writer(buffer, delimiter=delimiter).writerows(expected)
+                source = Path(tmp) / "report.csv"
+                source.write_bytes(buffer.getvalue().encode(encoding))
+                table, stats = workflow.parse_ads_csv_table(source)
+                self.assertEqual(table["preamble_rows"], preamble)
+                self.assertEqual(table["headers"], headers)
+                self.assertEqual(table["data_rows"], [metric_row])
+                self.assertEqual(stats["column_count"], 26)
+                self.assertEqual(stats["header_row"], 3)
+                output = Path(tmp) / "detail.csv"
+                workflow.write_filtered_ads_csv(table, table["data_rows"], output)
+                self.assertEqual(workflow.read_csv_rows(output), expected)
+
     def test_detailed_export_preserves_metrics_and_google_ads_metadata(self):
         csv_text = """Currency,USD
 Keyword,Avg. monthly searches,Three month change,YoY change,Competition,Competition (indexed value),Top of page bid (low range),Top of page bid (high range)

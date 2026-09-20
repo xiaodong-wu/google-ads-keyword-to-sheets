@@ -30,7 +30,10 @@ The supplied domain is a destination-tab selector only. The skill never enters i
 - For Sheets mode, access to the configured Google Sheet and an existing tab whose name exactly matches the normalized domain.
 - Python 3.9 or later for the CSV preparation helper and tests.
 
-The workflow follows the active controller's documented APIs. If it has no download-path API,
+The workflow follows the active controller's documented APIs. Arm a supported download event
+before clicking `.csv`, including when no path method is exposed. An automated
+`ERR_BLOCKED_BY_CLIENT` with a working manual download is not evidence of an ad-blocker extension.
+If the controller has no download-path API,
 it identifies the completed CSV through supported Downloads UI or bounded local download-file
 evidence, then verifies the source file before parsing. See
 [`references/browser-workflow.md`](references/browser-workflow.md). A missing optional skill does
@@ -90,6 +93,10 @@ The sheet contract validates the existing localized header strings exactly. Thei
 See [`references/sheet-contract.md`](references/sheet-contract.md) for the complete validation and write contract.
 
 ## CSV helper
+
+The parser accepts UTF-16 tab-separated Google Ads exports with single-cell title/date preambles,
+as well as comma and semicolon separators. When delimiter sniffing fails on uneven metadata rows,
+it uses the keyword header to identify the separator and preserves every original metric string.
 
 Normalize a domain:
 

@@ -179,7 +179,24 @@ def read_csv_rows(path: Path) -> List[List[str]]:
         dialect = csv.Sniffer().sniff(sample, delimiters=",\t;")
     except csv.Error:
         dialect = csv.excel
-    return [list(row) for row in csv.reader(io.StringIO(text), dialect)]
+    rows = [list(row) for row in csv.reader(io.StringIO(text), dialect)]
+    try:
+        locate_keyword_column(rows)
+        return rows
+    except KeywordWorkflowError:
+        # Ads reports may start with single-cell title/date rows. Their uneven
+        # widths can defeat Sniffer, especially with a truncated sample. Choose
+        # a delimiter by the actual keyword header, never by metric contents.
+        for delimiter in ("\t", ";", ","):
+            if delimiter == dialect.delimiter:
+                continue
+            candidate = [list(row) for row in csv.reader(io.StringIO(text), delimiter=delimiter)]
+            try:
+                locate_keyword_column(candidate)
+                return candidate
+            except KeywordWorkflowError:
+                continue
+        return rows
 
 
 def is_keyword_header(value: Any) -> bool:

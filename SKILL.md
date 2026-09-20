@@ -82,7 +82,8 @@ local CSV.
      Stop when an ad blocker, dialog, or account state prevents the query or export.
 
 4. **Download and filter all ideas**
-   - Open **Download keyword ideas** and choose `.csv`. Use only documented download APIs;
+   - Open **Download keyword ideas**, arm the controller's documented download event, then click
+     `.csv`. Do this even if the controller exposes no download-path method. Use only documented download APIs;
      otherwise locate the completed export through the tool's supported Downloads UI or a
      bounded check of the known local download directory, as described in
      `references/browser-workflow.md`. Confirm the file belongs to this exact query before parsing.

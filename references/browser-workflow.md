@@ -31,9 +31,20 @@ Use the **Download keyword ideas → .csv** action after the on-screen query set
 verified. Do not replace the export with a copied result table, estimated values, an API call,
 or another batch's file.
 
-- If the controller documents a download event and a file-save/path method, use those exact APIs.
-  Arm a supported download event before clicking the CSV option. A `waitForEvent("download")`
-  method alone does not imply that the returned object has `path()` or `saveAs()`.
+- Arm a documented download event **before** clicking the CSV option, even when the tool has no
+  download-path API. For the Chrome `mcp__cua_repl` controller, this sequence was live-verified:
+
+  ```javascript
+  // Use the .csv menuitem observed in the current page state.
+  const downloadReady = tab.playwright.waitForEvent("download", { timeoutMs: 30000 });
+  await tab.playwright.getByRole("menuitem", { name: ".csv", exact: true }).click();
+  await downloadReady;
+  ```
+
+  Follow with the bounded local-file verification below when the event exposes no documented
+  path method. `waitForEvent("download")` alone does not imply `path()` or `saveAs()`. Clicking CSV
+  without first arming the event caused an automated navigation to the report URL and
+  `ERR_BLOCKED_BY_CLIENT` in one verified run; arming the event completed the actual CSV download.
 - If no path API is provided, use a supported Downloads UI to observe the completed file and its
   name/path. A download that is still in progress, interrupted, or blocked is not complete.
 - When the local download directory is known from the tool, browser UI, or user configuration,
@@ -49,11 +60,13 @@ or another batch's file.
   record `blocked: download_unresolved`. Request only the missing file or connection needed to
   continue; retain successful batches.
 
-If the export opens a Chrome blocked page (for example `ERR_BLOCKED_BY_CLIENT` on the report
-storage host), record `blocked: download_blocked_by_client` and ask the user to resolve the
-browser/extension restriction. Preserve the tab for handoff. Do not replay the signed download
-URL through HTTP tools, another browser, or an API to bypass the restriction, and do not put
-signed URLs or their tokens in the audit manifest or repository.
+`ERR_BLOCKED_BY_CLIENT` alone does not establish an ad-blocker or extension cause. When manual
+export works, check the documented download-event sequence before asking for browser changes.
+If this supported sequence still fails, record `blocked: download_unresolved`, preserve the tab
+for handoff, and accept an unmodified user-downloaded CSV after verifying the exact seed and query
+settings. A manual file from another topic or a combined seed query cannot substitute for a batch.
+Honor explicit tool policy blocks: do not replay a blocked signed URL through HTTP tools, another
+browser, or an API, and do not put signed URLs or their tokens in the manifest or repository.
 
 Copy the identified original file unchanged into the job's audit directory without overwriting
 another batch. Record its SHA-256, export timestamp, browser tool, download filename/path evidence,
